@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>Mini Discord</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="login-screen">
+    <form id="login-form">
+      <h2>Вход в Mini Discord</h2>
+      <input type="text" id="login-name" placeholder="Ваш ник" maxlength="20" required>
+      <button type="submit">Войти</button>
+    </form>
+  </div>
+  <div id="app" style="display:none">
+    <aside class="sidebar">
+      <div class="server active">D</div>
+    </aside>
+    <nav class="channels">
+      <div class="channel active" data-type="public" data-channel="general"># general</div>
+      <div class="channels-title">Direct Messages</div>
+      <div id="dm-list"></div>
+      <form id="dm-form">
+        <input type="text" id="dm-input" placeholder="Новый личный чат (@username)" maxlength="20" autocomplete="off">
+        <button type="submit">+</button>
+      </form>
+    </nav>
+    <main class="chat" style="min-width:320px; flex:1 0 340px;">
+      <div class="messages" id="messages"></div>
+      <form id="chat-form">
+        <label id="file-btn" for="file-input" title="Отправить фото">📷</label>
+        <input type="file" id="file-input" accept="image/*" style="display:none">
+        <input type="text" id="message-input" placeholder="Type your message..." autocomplete="off">
+        <button type="submit">Send</button>
+      </form>
+    </main>
+    <aside class="users">
+      <div class="voice-panel" id="voice-panel">
+        <div class="vp-title">Голосовой чат</div>
+        <div class="vp-status" id="voice-status">Вы не в голосовом чате</div>
+        <button id="voice-toggle">Войти</button>
+        <div class="vp-users" id="voice-users"></div>
+      </div>
+      <div class="users-header" style="margin-top:22px;">
+        <h3>Online</h3>
+        <button id="logout-btn" title="Выйти" type="button">Logout</button>
+      </div>
+      <ul id="user-list"></ul>
+    </aside>
+  </div>
+  <!-- Модалка профиля -->
+  <div id="profile-modal-bg">
+    <div id="profile-modal">
+      <div class="pm-avatar"></div>
+      <div class="pm-nick"></div>
+      <div class="pm-desc">Здесь будет информация о пользователе…</div>
+      <button class="pm-close">Закрыть</button>
+    </div>
+  </div>
+  <script src="script.js"></script>
+</body>
+</html>
