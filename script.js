@@ -563,3 +563,126 @@ function showProfileModal(user) {
 function hideProfileModal() {
   if (profileModalBg) profileModalBg.style.display = 'none';
 }
+
+// === Настройки для WebRTC голосового чата ===
+const SIGNAL_SERVER = 'ws://localhost:3001'; // Замени на твой сервер, если не локалка
+let wsSignal = null;
+let rtcConnections = {};
+let localStream = null;
+let myRtcId = null;
+
+// --- Войти в голосовой чат (WebRTC) ---
+async function joinVoiceChat() {
+  try {
+    // Получаем аудио
+    localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+  } catch(e) {
+    alert('Не удалось получить доступ к микрофону');
+    return;
+  }
+
+  myRtcId = Math.random().toString(36).slice(2);
+  wsSignal = new WebSocket(SIGNAL_SERVER);
+
+  wsSignal.onopen = () => {
+    wsSignal.send(JSON.stringify({ type: 'join', user: currentUser, rtcId: myRtcId }));
+  };
+
+  wsSignal.onmessage = async (event) => {
+    const msg = JSON.parse(event.data);
+    if (msg.rtcId === myRtcId) return;
+
+    // JOIN — новый человек, инициируем соединение
+    if (msg.type === 'join') {
+      createOffer(msg.rtcId);
+    }
+    // OFFER
+    if (msg.type === 'offer') {
+      await createAnswer(msg.rtcId, msg.data);
+    }
+    // ANSWER
+    if (msg.type === 'answer') {
+      await rtcConnections[msg.rtcId].setRemoteDescription(new RTCSessionDescription(msg.data));
+    }
+    // ICE
+    if (msg.type === 'ice') {
+      await rtcConnections[msg.rtcId]?.addIceCandidate(new RTCIceCandidate(msg.data));
+    }
+  };
+
+  wsSignal.onclose = leaveVoiceChat;
+}
+
+function createConnection(rtcId) {
+  const conn = new RTCPeerConnection({
+    iceServers: [
+      { urls: 'stun:stun.l.google.com:19302' }
+    ]
+  });
+
+  // Локальный звук
+  localStream.getTracks().forEach(track => conn.addTrack(track, localStream));
+
+  conn.onicecandidate = (e) => {
+    if (e.candidate && wsSignal && wsSignal.readyState === 1) {
+      wsSignal.send(JSON.stringify({ type: 'ice', user: currentUser, rtcId: myRtcId, data: e.candidate }));
+    }
+  };
+
+  conn.ontrack = (e) => {
+    let audio = document.getElementById('audio_' + rtcId);
+    if (!audio) {
+      audio = document.createElement('audio');
+      audio.id = 'audio_' + rtcId;
+      audio.autoplay = true;
+      audio.controls = false;
+      document.body.appendChild(audio);
+    }
+    audio.srcObject = e.streams[0];
+  };
+
+  rtcConnections[rtcId] = conn;
+  return conn;
+}
+
+async function createOffer(rtcId) {
+  const conn = createConnection(rtcId);
+  const offer = await conn.createOffer();
+  await conn.setLocalDescription(offer);
+  wsSignal.send(JSON.stringify({ type: 'offer', user: currentUser, rtcId: myRtcId, data: offer }));
+}
+
+async function createAnswer(rtcId, offer) {
+  const conn = createConnection(rtcId);
+  await conn.setRemoteDescription(new RTCSessionDescription(offer));
+  const answer = await conn.createAnswer();
+  await conn.setLocalDescription(answer);
+  wsSignal.send(JSON.stringify({ type: 'answer', user: currentUser, rtcId: myRtcId, data: answer }));
+}
+
+function leaveVoiceChat() {
+  if (wsSignal) try { wsSignal.close(); } catch{}
+  wsSignal = null;
+  Object.values(rtcConnections).forEach(conn => conn.close());
+  rtcConnections = {};
+  document.querySelectorAll('audio[id^="audio_"]').forEach(a => a.remove());
+  if (localStream) {
+    localStream.getTracks().forEach(track => track.stop());
+    localStream = null;
+  }
+}
+
+// --- Перехватываем клик по voiceToggle ---
+voiceToggle.onclick = async function() {
+  if (!inVoice) {
+    await joinVoiceChat();
+    // в updateVoicePanel() и локалсторедж ты уже добавляешь пользователя в список голосовых
+    updateVoicePanel();
+  } else {
+    leaveVoiceChat();
+    // убираем себя из голосового списка
+    let users = getVoiceUsers().filter(u => u !== currentUser);
+    setVoiceUsers(users);
+    updateVoicePanel();
+  }
+};
